@@ -21,21 +21,13 @@ const (
 
 // InitCertificates ensures valid certificates exist or generates new ones
 func InitCertificates() (cert, key []byte, err error) {
-	// Check for custom certificates first
-	customCertFile := "custom_cert.pem"
-	customKeyFile := "custom_key.pem"
-	
-	if cert, key, err = loadCertificatesFromFiles(customCertFile, customKeyFile); err == nil {
-		log.Println("Using custom SSL/TLS certificates")
-		return cert, key, nil
-	}
-	
-	// Check if default certificates already exist
+	// Check if certificates already exist
 	if cert, key, err = loadCertificates(); err == nil {
+		log.Println("Using existing SSL/TLS certificates")
 		return cert, key, nil
 	}
 
-	// Generate new certificates
+	// Generate new certificates if they don't exist
 	log.Println("Generating new self-signed certificates")
 	return generateCertificates()
 }

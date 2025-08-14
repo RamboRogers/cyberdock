@@ -12,7 +12,6 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"path/filepath"
 	"time"
 )
 
@@ -29,15 +28,8 @@ type CertificateInfo struct {
 
 // getCertificateInfo retrieves information about the current certificate
 func (s *Server) getCertificateInfo() (*CertificateInfo, error) {
-	// Check for custom certificate first
-	customCertPath := filepath.Join(filepath.Dir(s.certFile), "custom_cert.pem")
+	// Always read from the main certificate file
 	certPath := s.certFile
-	isCustom := false
-	
-	if _, err := os.Stat(customCertPath); err == nil {
-		certPath = customCertPath
-		isCustom = true
-	}
 	
 	// Read certificate file
 	certPEM, err := ioutil.ReadFile(certPath)
@@ -61,6 +53,11 @@ func (s *Server) getCertificateInfo() (*CertificateInfo, error) {
 	for i, ip := range cert.IPAddresses {
 		ipAddresses[i] = ip.String()
 	}
+	
+	// Determine if this is a custom certificate by checking if it's self-signed by CyberDock
+	isCustom := cert.Issuer.Organization == nil || 
+		len(cert.Issuer.Organization) == 0 || 
+		cert.Issuer.Organization[0] != "CyberDock"
 	
 	return &CertificateInfo{
 		Subject:     cert.Subject.String(),

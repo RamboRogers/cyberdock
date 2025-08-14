@@ -536,16 +536,14 @@ func (s *Server) handleCertificateUpload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	
-	// Save custom certificates
-	customCertPath := filepath.Join(filepath.Dir(s.certFile), "custom_cert.pem")
-	customKeyPath := filepath.Join(filepath.Dir(s.keyFile), "custom_key.pem")
-	
-	if err := os.WriteFile(customCertPath, certData, 0644); err != nil {
+	// Overwrite the default certificates directly
+	// This ensures they'll be used on next restart
+	if err := os.WriteFile("cert.pem", certData, 0644); err != nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save certificate"})
 		return
 	}
 	
-	if err := os.WriteFile(customKeyPath, keyData, 0600); err != nil {
+	if err := os.WriteFile("key.pem", keyData, 0600); err != nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save key"})
 		return
 	}
@@ -582,11 +580,7 @@ func (s *Server) handleCertificateGenerate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	
-	// Remove custom certificates if they exist
-	customCertPath := filepath.Join(filepath.Dir(s.certFile), "custom_cert.pem")
-	customKeyPath := filepath.Join(filepath.Dir(s.keyFile), "custom_key.pem")
-	os.Remove(customCertPath)
-	os.Remove(customKeyPath)
+	// No need to remove custom certificates since we're overwriting the main ones
 	
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "success",
