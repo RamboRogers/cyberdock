@@ -1584,6 +1584,16 @@ func (s *Server) GetPort() int {
 	return s.port
 }
 
+// GetRouter returns the mux router for the registry server
+func (s *Server) GetRouter() *mux.Router {
+	return s.router
+}
+
+// ServeHTTP implements http.Handler interface
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.router.ServeHTTP(w, r)
+}
+
 // handleAPIVersion returns the supported API versions
 func (s *Server) handleAPIVersion(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

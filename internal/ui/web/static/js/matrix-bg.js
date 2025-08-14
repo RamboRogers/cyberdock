@@ -22,31 +22,49 @@ function initMatrix(canvasId, opacity = 0.8) {
     ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    function draw() {
-        // Semi-transparent black background for fade effect
-        ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Green text
-        ctx.fillStyle = '#0F0';
-        ctx.font = fontSize + 'px monospace';
-
-        // Loop over drops
-        for (let i = 0; i < drops.length; i++) {
-            // Random character
-            const char = charArray[Math.floor(Math.random() * charArray.length)];
-
-            // Draw character
-            ctx.fillText(char, i * fontSize, drops[i] * fontSize);
-
-            // Reset drop or move it down
-            if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-                drops[i] = 0;
-            }
-            drops[i]++;
+    let lastTime = 0;
+    const fps = 30;
+    const interval = 1000 / fps;
+    
+    function draw(currentTime) {
+        // Only draw if theme is cyber
+        const theme = document.body.getAttribute('data-theme') || 'cyber';
+        if (theme === 'boomer') {
+            return;
         }
+        
+        // Throttle to 30fps
+        if (currentTime - lastTime >= interval) {
+            // Semi-transparent black background for fade effect
+            ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Green text
+            ctx.fillStyle = '#0F0';
+            ctx.font = fontSize + 'px monospace';
+
+            // Loop over drops
+            for (let i = 0; i < drops.length; i++) {
+                // Random character
+                const char = charArray[Math.floor(Math.random() * charArray.length)];
+
+                // Draw character
+                ctx.fillText(char, i * fontSize, drops[i] * fontSize);
+
+                // Reset drop or move it down
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+            
+            lastTime = currentTime;
+        }
+        
+        // Store animation ID globally
+        window.matrixAnimation = requestAnimationFrame(draw);
     }
 
-    // Run animation at 30fps
-    return setInterval(draw, 33);
+    // Start animation
+    window.matrixAnimation = requestAnimationFrame(draw);
 }

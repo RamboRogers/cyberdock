@@ -56,3 +56,15 @@ if [ "$push" = "y" ]; then
     -t mattrogers/cyberdock:${VERSION} \
     -f Dockerfile.multi .
 fi
+
+read -p "Push to Gitea? (y/n): " push
+if [ "$push" = "y" ]; then
+  # Building Docker Image
+  echo "Building for Linux platform..."
+  docker buildx build \
+    --push \
+    --platform linux/amd64,linux/arm64 \
+    -t cyberpam:5000/matt/cyberdock:latest \
+    -t cyberpam:5000/matt/cyberdock:${VERSION} \
+    -f Dockerfile.multi .
+fi

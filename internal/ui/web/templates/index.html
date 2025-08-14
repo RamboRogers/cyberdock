@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}}</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="{{if ne .BasePath ""}}/admin{{end}}/static/css/style.css">
 </head>
 <body>
     <!-- Matrix background canvas -->
@@ -14,6 +14,9 @@
         <header>
             <h1><a href="https://github.com/ramborogers/cyberdock" target="_blank" class="title-link">CyberDock</a></h1>
             <p class="subtitle">Docker Registry Interface and Server - Version {{.Version}}</p>
+            <button id="themeToggle" class="theme-toggle" title="Toggle Theme">
+                <span class="theme-icon">🌙</span>
+            </button>
         </header>
         <div class="stats-panel">
             <div class="stat-block disk-block">
@@ -79,6 +82,7 @@
                 <button class="tab-btn active" data-tab="images">Images</button>
                 <button class="tab-btn" data-tab="tags">Tags</button>
                 <button class="tab-btn" data-tab="analytics">Analytics</button>
+                <button class="tab-btn" data-tab="certificates">Certificates</button>
             </div>
 
             <section id="images-tab" class="tab-content active">
@@ -152,6 +156,44 @@
                     </div>
                 </div>
             </section>
+            
+            <section id="certificates-tab" class="tab-content">
+                <div id="certificates-content">
+                    <div class="cert-management">
+                        <h3>SSL/TLS Certificate Management</h3>
+                        
+                        <div class="cert-info">
+                            <h4>Current Certificate Status</h4>
+                            <div id="cert-status" class="cert-status-panel">
+                                <div class="loading">Loading certificate information...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="cert-upload">
+                            <h4>Upload Custom Certificate</h4>
+                            <form id="cert-upload-form" class="cert-form">
+                                <div class="form-group">
+                                    <label for="cert-file">Certificate File (cert.pem)</label>
+                                    <input type="file" id="cert-file" name="cert" accept=".pem,.crt,.cer" required>
+                                    <small>Upload your SSL certificate in PEM format</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="key-file">Private Key File (key.pem)</label>
+                                    <input type="file" id="key-file" name="key" accept=".pem,.key" required>
+                                    <small>Upload your private key in PEM format</small>
+                                </div>
+                                <button type="submit" class="cert-upload-btn">Upload Certificate</button>
+                            </form>
+                            <div id="upload-status" class="upload-status"></div>
+                        </div>
+                        
+                        <div class="cert-actions">
+                            <button id="generate-cert-btn" class="action-btn">Generate New Self-Signed Certificate</button>
+                            <button id="refresh-cert-btn" class="action-btn">Refresh Certificate Info</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
 
         <footer>
@@ -192,8 +234,8 @@
         window.STORAGE_EFFICIENCY = "{{.DiskUsage.StorageEfficiency}}";
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/static/js/matrix-bg.js"></script>
-    <script src="/static/js/app.js"></script>
+    <script src="{{if ne .BasePath ""}}/admin{{end}}/static/js/matrix-bg.js"></script>
+    <script src="{{if ne .BasePath ""}}/admin{{end}}/static/js/app.js"></script>
 
     <!-- Custom Confirmation Dialog -->
     <div id="confirmDialog" class="confirm-dialog">

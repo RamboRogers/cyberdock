@@ -7,14 +7,51 @@
     --error-glow: 0 0 10px var(--neon-red);
 }
 
+/* Cyber theme (default) */
+[data-theme="cyber"] {
+    --primary-color: #00ff00;
+    --secondary-color: #ff0000;
+    --bg-color: #000000;
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --border-color: var(--neon-green);
+    --border-style: 0 0 10px var(--neon-green);
+    --error-style: 0 0 10px var(--neon-red);
+    --panel-bg: rgba(0, 0, 0, 0.9);
+    --panel-border: 1px solid var(--neon-green);
+    --font-family: 'Courier New', monospace;
+}
+
+/* Boomer theme (professional) */
+[data-theme="boomer"] {
+    --primary-color: #2c3e50;
+    --secondary-color: #e74c3c;
+    --bg-color: #f5f5f5;
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --border-color: #ddd;
+    --border-style: none;
+    --error-style: none;
+    --panel-bg: #ffffff;
+    --panel-border: 1px solid #e0e0e0;
+    --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --neon-green: #27ae60;
+    --neon-red: #e74c3c;
+    --dark-bg: #f5f5f5;
+    --text-color: #333333;
+    --border-glow: none;
+    --error-glow: none;
+}
+
 body {
     background-color: var(--dark-bg);
     color: var(--text-color);
-    font-family: 'Courier New', monospace;
+    font-family: var(--font-family, 'Courier New', monospace);
     line-height: 1.6;
     min-height: 100vh;
     margin: 0;
     padding: 20px;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .container {
@@ -26,13 +63,45 @@ body {
 header {
     margin-bottom: 0.5rem;
     text-align: center;
+    position: relative;
 }
 
 header h1 {
     margin: 0;
     font-size: 1.5rem;
     color: var(--neon-green);
-    text-shadow: 0 0 10px var(--neon-green);
+    text-shadow: var(--border-glow);
+}
+
+.theme-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    font-family: inherit;
+}
+
+.theme-toggle:hover {
+    background: var(--border-color);
+    color: var(--dark-bg);
+    box-shadow: var(--border-style);
+}
+
+[data-theme="boomer"] .theme-toggle {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+[data-theme="boomer"] .theme-toggle:hover {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
 }
 
 .subtitle {
@@ -1234,4 +1303,376 @@ footer {
 .platform-badge:hover {
     background: rgba(0, 255, 255, 0.2);
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+/* Boomer theme specific overrides */
+[data-theme="boomer"] {
+    /* Remove matrix background for boomer theme */
+    .matrix-canvas {
+        display: none;
+    }
+    
+    /* Professional panels */
+    .repository-item {
+        border: 1px solid #e0e0e0;
+        background: #ffffff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .repository-item:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        transform: translateY(-1px);
+    }
+    
+    /* Stats panel */
+    .stats-panel {
+        background: #ffffff;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stat-block {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+    }
+    
+    .stat-block::before {
+        display: none;
+    }
+    
+    /* Professional buttons */
+    .purge-btn {
+        background: #dc3545;
+        border: 1px solid #dc3545;
+        text-shadow: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .purge-btn:hover {
+        background: #c82333;
+        border-color: #bd2130;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+    }
+    
+    /* Tab buttons */
+    .tab-btn {
+        border: 1px solid #dee2e6;
+        background: #f8f9fa;
+    }
+    
+    .tab-btn:hover, .tab-btn.active {
+        background: var(--primary-color);
+        color: white;
+        border-color: var(--primary-color);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Remove all glows and shadows */
+    * {
+        text-shadow: none !important;
+    }
+    
+    .stat-value,
+    .stat-label,
+    header h1,
+    .repository-header h3,
+    .project-name {
+        text-shadow: none !important;
+    }
+    
+    /* Professional footer */
+    footer {
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+    }
+    
+    /* Disk usage bar */
+    .disk-usage-bar {
+        border: 1px solid #dee2e6;
+        background: #f8f9fa;
+    }
+    
+    .usage-bar {
+        box-shadow: none;
+    }
+    
+    .usage-bar.optimal {
+        background: #28a745;
+    }
+    
+    .usage-bar.good {
+        background: #ffc107;
+    }
+    
+    .usage-bar.suboptimal {
+        background: #dc3545;
+    }
+    
+    /* Search input */
+    .search-input,
+    .filter-select {
+        border: 1px solid #ced4da;
+        background: white;
+        color: #495057;
+    }
+    
+    .search-input:focus,
+    .filter-select:focus {
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    }
+    
+    /* Confirmation dialog */
+    .confirm-dialog-content {
+        background: white;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    
+    .confirm-yes {
+        background: #28a745;
+        border: 1px solid #28a745;
+        color: white;
+    }
+    
+    .confirm-yes:hover {
+        background: #218838;
+        border-color: #1e7e34;
+    }
+    
+    .confirm-no {
+        background: #6c757d;
+        border: 1px solid #6c757d;
+        color: white;
+    }
+    
+    .confirm-no:hover {
+        background: #5a6268;
+        border-color: #545b62;
+    }
+}
+
+/* Certificate Management Styles */
+.cert-management {
+    padding: 1rem;
+}
+
+.cert-management h3 {
+    color: var(--neon-green);
+    margin-bottom: 2rem;
+    text-shadow: var(--border-glow);
+}
+
+.cert-management h4 {
+    color: var(--neon-green);
+    margin-bottom: 1rem;
+    text-shadow: 0 0 5px var(--neon-green);
+}
+
+.cert-info,
+.cert-upload,
+.cert-actions {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: rgba(0, 255, 0, 0.05);
+    border: 1px solid var(--neon-green);
+    box-shadow: var(--border-glow);
+}
+
+.cert-status-panel {
+    font-family: var(--font-family);
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 255, 0, 0.3);
+}
+
+.cert-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    color: var(--neon-green);
+    font-weight: bold;
+    text-shadow: 0 0 5px var(--neon-green);
+}
+
+.form-group input[type="file"] {
+    background: rgba(0, 255, 0, 0.05);
+    border: 1px solid var(--neon-green);
+    color: var(--text-color);
+    padding: 0.5rem;
+    font-family: inherit;
+    transition: all 0.3s ease;
+}
+
+.form-group input[type="file"]:hover {
+    background: rgba(0, 255, 0, 0.1);
+    box-shadow: 0 0 10px var(--neon-green);
+}
+
+.form-group small {
+    color: #999;
+    font-size: 0.8rem;
+}
+
+.cert-upload-btn,
+.action-btn {
+    background: transparent;
+    border: 1px solid var(--neon-green);
+    color: var(--neon-green);
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: inherit;
+}
+
+.cert-upload-btn:hover,
+.action-btn:hover {
+    background: var(--neon-green);
+    color: var(--dark-bg);
+    box-shadow: 0 0 15px var(--neon-green);
+}
+
+.cert-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.upload-status {
+    margin-top: 1rem;
+    padding: 0.5rem;
+    text-align: center;
+    display: none;
+}
+
+.upload-status.success {
+    display: block;
+    color: var(--neon-green);
+    border: 1px solid var(--neon-green);
+    background: rgba(0, 255, 0, 0.1);
+}
+
+.upload-status.error {
+    display: block;
+    color: var(--neon-red);
+    border: 1px solid var(--neon-red);
+    background: rgba(255, 0, 0, 0.1);
+}
+
+/* Boomer theme certificate styles */
+[data-theme="boomer"] .cert-management h3,
+[data-theme="boomer"] .cert-management h4 {
+    color: var(--primary-color);
+    text-shadow: none;
+}
+
+[data-theme="boomer"] .cert-info,
+[data-theme="boomer"] .cert-upload,
+[data-theme="boomer"] .cert-actions {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+[data-theme="boomer"] .cert-status-panel {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+[data-theme="boomer"] .form-group label {
+    color: var(--primary-color);
+    text-shadow: none;
+}
+
+[data-theme="boomer"] .form-group input[type="file"] {
+    background: white;
+    border: 1px solid #ced4da;
+    color: #495057;
+}
+
+[data-theme="boomer"] .form-group input[type="file"]:hover {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+[data-theme="boomer"] .cert-upload-btn,
+[data-theme="boomer"] .action-btn {
+    background: var(--primary-color);
+    border: 1px solid var(--primary-color);
+    color: white;
+}
+
+[data-theme="boomer"] .cert-upload-btn:hover,
+[data-theme="boomer"] .action-btn:hover {
+    background: #1a252f;
+    border-color: #1a252f;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+}
+
+[data-theme="boomer"] .upload-status.success {
+    background: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+[data-theme="boomer"] .upload-status.error {
+    background: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+/* Certificate details styles */
+.cert-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.cert-field {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(0, 255, 0, 0.2);
+}
+
+.cert-field:last-child {
+    border-bottom: none;
+}
+
+.field-label {
+    color: var(--neon-green);
+    font-weight: bold;
+    text-shadow: 0 0 5px var(--neon-green);
+}
+
+.field-value {
+    color: var(--text-color);
+    text-align: right;
+    max-width: 60%;
+    word-break: break-word;
+}
+
+[data-theme="boomer"] .cert-field {
+    border-bottom-color: #e9ecef;
+}
+
+[data-theme="boomer"] .field-label {
+    color: var(--primary-color);
+    text-shadow: none;
+}
+
+[data-theme="boomer"] .field-value {
+    color: #495057;
 }
