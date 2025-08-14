@@ -60,24 +60,47 @@ func NewServer(cert, key []byte, certFile, keyFile string, port int, registry *r
 	}
 }
 
-// Start initializes and starts the UI server
-func (s *Server) Start() error {
+// InitializeRoutes sets up all the routes for the UI server
+func (s *Server) InitializeRoutes() {
 	// Initialize router
 	s.router = mux.NewRouter()
 
 	// UI routes
 	s.router.HandleFunc("/", s.handleUI)
+	s.router.HandleFunc("/admin/", s.handleUI)
 	s.router.HandleFunc("/static/{type}/{file}", s.handleStatic)
+	s.router.HandleFunc("/admin/static/{type}/{file}", s.handleStatic)
 
-	// API routes
+	// API routes (handle both with and without /admin prefix for single-port mode)
 	s.router.HandleFunc("/api/images", s.handleImages).Methods("GET")
 	s.router.HandleFunc("/api/images/{repository:.*}/{reference}", s.handleImages).Methods("GET", "DELETE")
 	s.router.HandleFunc("/api/tags", s.handleTags).Methods("GET")
 	s.router.HandleFunc("/api/purge", s.handlePurge).Methods("POST")
 	s.router.HandleFunc("/api/disk-usage", s.handleDiskUsage).Methods("GET")
+	
+	s.router.HandleFunc("/admin/api/images", s.handleImages).Methods("GET")
+	s.router.HandleFunc("/admin/api/images/{repository:.*}/{reference}", s.handleImages).Methods("GET", "DELETE")
+	s.router.HandleFunc("/admin/api/tags", s.handleTags).Methods("GET")
+	s.router.HandleFunc("/admin/api/purge", s.handlePurge).Methods("POST")
+	s.router.HandleFunc("/admin/api/disk-usage", s.handleDiskUsage).Methods("GET")
+	
+	// Certificate API routes
+	s.router.HandleFunc("/api/certificate/info", s.handleCertificateInfo).Methods("GET")
+	s.router.HandleFunc("/api/certificate/upload", s.handleCertificateUpload).Methods("POST")
+	s.router.HandleFunc("/api/certificate/generate", s.handleCertificateGenerate).Methods("POST")
+	
+	s.router.HandleFunc("/admin/api/certificate/info", s.handleCertificateInfo).Methods("GET")
+	s.router.HandleFunc("/admin/api/certificate/upload", s.handleCertificateUpload).Methods("POST")
+	s.router.HandleFunc("/admin/api/certificate/generate", s.handleCertificateGenerate).Methods("POST")
+}
+
+// Start initializes and starts the UI server
+func (s *Server) Start() error {
+	// Initialize routes
+	s.InitializeRoutes()
 
 	// Start monitoring disk usage
-	go s.monitorDiskUsage()
+	go s.MonitorDiskUsage()
 
 	// Start server
 	log.Printf("Starting UI server on port %d", s.port)
@@ -120,10 +143,24 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 
 	// Get registry host from request
 	host := r.Host
-	if idx := strings.Index(host, ":"); idx != -1 {
-		host = host[:idx]
+	// In single-port mode, registry is on the same host/port under /v2/
+	var registryHost string
+	if s.port == s.registry.GetPort() {
+		// Single-port mode - use relative path
+		registryHost = fmt.Sprintf("https://%s", host)
+	} else {
+		// Dual-port mode - use different port
+		if idx := strings.Index(host, ":"); idx != -1 {
+			host = host[:idx]
+		}
+		registryHost = fmt.Sprintf("https://%s:%d", host, s.registry.GetPort())
 	}
-	registryHost := fmt.Sprintf("https://%s:%d", host, s.registry.GetPort())
+
+	// Check if we're in single-port mode by looking at the request path
+	basePath := ""
+	if strings.HasPrefix(r.URL.Path, "/admin/") {
+		basePath = "/admin"
+	}
 
 	data := struct {
 		Title        string
@@ -131,12 +168,14 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 		LastUpdate   time.Time
 		Version      string
 		RegistryHost string
+		BasePath     string
 	}{
 		Title:        "CyberDock Registry",
 		DiskUsage:    s.diskUsage,
 		LastUpdate:   s.diskUsage.LastCheck,
 		Version:      s.version,
 		RegistryHost: registryHost,
+		BasePath:     basePath,
 	}
 
 	if err := tmpl.Execute(w, data); err != nil {
@@ -365,7 +404,8 @@ func countTotalTags(images []registry.ImageInfo) int {
 }
 
 // monitorDiskUsage periodically updates the disk usage information
-func (s *Server) monitorDiskUsage() {
+// MonitorDiskUsage monitors disk usage in a goroutine
+func (s *Server) MonitorDiskUsage() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
@@ -375,6 +415,16 @@ func (s *Server) monitorDiskUsage() {
 
 		<-ticker.C
 	}
+}
+
+// GetRouter returns the mux router for the UI server
+func (s *Server) GetRouter() *mux.Router {
+	return s.router
+}
+
+// ServeHTTP implements http.Handler interface
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.router.ServeHTTP(w, r)
 }
 
 // handleStatic serves static files from the embedded filesystem
@@ -408,4 +458,138 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 
 	// Write the file content
 	w.Write(content)
+}
+
+// handleCertificateInfo returns information about the current certificate
+func (s *Server) handleCertificateInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	certInfo, err := s.getCertificateInfo()
+	if err != nil {
+		log.Printf("ERROR: Failed to get certificate info: %v", err)
+		http.Error(w, fmt.Sprintf(`{"error": "%s"}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+	
+	if err := json.NewEncoder(w).Encode(certInfo); err != nil {
+		log.Printf("ERROR: Failed to encode certificate info: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// handleCertificateUpload handles certificate upload requests
+func (s *Server) handleCertificateUpload(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	// Parse multipart form
+	err := r.ParseMultipartForm(10 << 20) // 10 MB limit
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to parse form"})
+		return
+	}
+	
+	// Get certificate file
+	certFile, _, err := r.FormFile("cert")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "Certificate file required"})
+		return
+	}
+	defer certFile.Close()
+	
+	// Get key file
+	keyFile, _, err := r.FormFile("key")
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "Key file required"})
+		return
+	}
+	defer keyFile.Close()
+	
+	// Read certificate content
+	certData := make([]byte, 0)
+	buf := make([]byte, 1024)
+	for {
+		n, err := certFile.Read(buf)
+		if n > 0 {
+			certData = append(certData, buf[:n]...)
+		}
+		if err != nil {
+			break
+		}
+	}
+	
+	// Read key content
+	keyData := make([]byte, 0)
+	buf = make([]byte, 1024)
+	for {
+		n, err := keyFile.Read(buf)
+		if n > 0 {
+			keyData = append(keyData, buf[:n]...)
+		}
+		if err != nil {
+			break
+		}
+	}
+	
+	// Validate certificate and key
+	if err := validateCertificateAndKey(certData, keyData); err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Invalid certificate or key: %v", err)})
+		return
+	}
+	
+	// Save custom certificates
+	customCertPath := filepath.Join(filepath.Dir(s.certFile), "custom_cert.pem")
+	customKeyPath := filepath.Join(filepath.Dir(s.keyFile), "custom_key.pem")
+	
+	if err := os.WriteFile(customCertPath, certData, 0644); err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save certificate"})
+		return
+	}
+	
+	if err := os.WriteFile(customKeyPath, keyData, 0600); err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save key"})
+		return
+	}
+	
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "success",
+		"message": "Certificate uploaded successfully. Please restart the server to apply changes.",
+	})
+}
+
+// handleCertificateGenerate generates a new self-signed certificate
+func (s *Server) handleCertificateGenerate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	
+	// Import the cert package
+	certPkg := "github.com/cyberdock/internal/cert"
+	_ = certPkg
+	
+	// Generate new certificates
+	cert, key, err := generateNewCertificates()
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": fmt.Sprintf("Failed to generate certificate: %v", err)})
+		return
+	}
+	
+	// Save the new certificates
+	if err := os.WriteFile(s.certFile, cert, 0644); err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save certificate"})
+		return
+	}
+	
+	if err := os.WriteFile(s.keyFile, key, 0600); err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save key"})
+		return
+	}
+	
+	// Remove custom certificates if they exist
+	customCertPath := filepath.Join(filepath.Dir(s.certFile), "custom_cert.pem")
+	customKeyPath := filepath.Join(filepath.Dir(s.keyFile), "custom_key.pem")
+	os.Remove(customCertPath)
+	os.Remove(customKeyPath)
+	
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "success",
+		"message": "New self-signed certificate generated successfully.",
+	})
 }

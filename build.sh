@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="0.3.1d"
+VERSION="0.3.2d"
 rm -rf bins/*
 mkdir -p bins
 

@@ -17,7 +17,7 @@
   <p><strong>Cyberpunk Docker Registry Interface</strong></p>
   <p>🐳 Docker Registry | 🌍 Web UI | ⚡ Fast | 🎨 Beautiful | 🔒 Secure</p>
   <p>
-    <img src="https://img.shields.io/badge/version-0.3.1d-blue.svg" alt="Version 0.3.1d">
+    <img src="https://img.shields.io/badge/version-0.3.2d-blue.svg" alt="Version 0.3.2d">
     <img src="https://img.shields.io/badge/go-%3E%3D1.21-00ADD8.svg" alt="Go Version">
     <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20docker-brightgreen.svg" alt="Platform Support">
     <img src="https://img.shields.io/badge/license-GPLv3-green.svg" alt="License">
@@ -92,26 +92,60 @@ CyberDock is a sleek, cyberpunk-themed Docker Registry with an integrated web in
 ### Docker
 
 Docker image is a simple way to get started.
+
+#### Single-Port Mode (Recommended)
 ```bash
-docker run -d --name cyberdock -p 5000:5000 -p 5001:5001 mattrogers/cyberdock:latest
+# Run on port 5000 (both registry and UI)
+docker run -d --name cyberdock -p 5000:5000 mattrogers/cyberdock:latest
 ```
 
-1. Access the interfaces:
-   - Registry: https://localhost:5000
-   - Web UI: https://localhost:5001
+Access points:
+- Registry API: https://localhost:5000/v2/
+- Admin UI: https://localhost:5000/admin/
+- Root (/) redirects to /admin/
 
-If you have a mac 🍏 host and want to work around the port conflicts.
+#### Legacy Dual-Port Mode
 ```bash
-docker run -d --name cyberdock -p 5005:5000 -p 5006:5001 -mattrogers/cyberdock:latest
+# Run with separate ports
+docker run -d --name cyberdock -p 5000:5000 -p 5001:5001 mattrogers/cyberdock:latest -r 5000 -g 5001
 ```
 
-1. Access the interfaces:
-   - Registry: https://localhost:5005
-   - Web UI: https://localhost:5006
+Access points:
+- Registry: https://localhost:5000
+- Web UI: https://localhost:5001
+
+If you have a mac 🍏 host and want to work around the port conflicts:
+```bash
+# Single-port mode on custom port
+docker run -d --name cyberdock -p 5005:5000 mattrogers/cyberdock:latest
+# Access at https://localhost:5005/admin/
+
+# Or dual-port mode
+docker run -d --name cyberdock -p 5005:5000 -p 5006:5001 mattrogers/cyberdock:latest -r 5000 -g 5001
+# Registry: https://localhost:5005
+# Web UI: https://localhost:5006
+```
 
 ## 💻 Usage
 
-CyberDock runs two servers:
+### Single-Port Mode (Default)
+CyberDock now runs both the registry and admin UI on a single port by default, simplifying deployment:
+```bash
+./cyberdock -p 5000
+```
+
+Path-based routing:
+- `/v2/*` - Docker Registry API (for docker push/pull)
+- `/admin/*` - Web UI for managing the registry
+- `/api/*` - Management API endpoints
+- `/static/*` - Static assets for the UI
+- `/` - Redirects to `/admin/`
+
+### Legacy Dual-Port Mode
+For backward compatibility, you can still run with separate ports:
+```bash
+./cyberdock -r 5000 -g 5001
+```
 - Registry server on port 5000
 - Web UI server on port 5001
 
@@ -120,7 +154,9 @@ Remote Purge ☢️
 curl -k -X POST https://cyberdock:5001/api/purge
 ```
 
-### Docker Configuration
+### Docker Client Configuration
+
+The Docker client works seamlessly with both single-port and dual-port modes.
 
 Add to your Docker daemon configuration:
 ```json
@@ -142,17 +178,26 @@ docker pull localhost:5000/your-image:tag
 
 ## 🔧 Configuration
 
-Default ports:
-- Registry: 5000
-- Web UI: 5001
-
 Command line flags:
 ```bash
+# Single-port mode (default)
+-p PORT  # Run both registry and UI on single port (default: 5000)
+
+# Dual-port mode (legacy)
 -r PORT  # Set registry port (default: 5000)
 -g PORT  # Set web UI port (default: 5001)
 ```
 
+Note: When both `-r` and `-g` are specified, CyberDock automatically switches to dual-port mode for backward compatibility.
+
 ## ⚡️ Updates
+
+- 0.3.2d:
+  - Added single-port mode as default deployment option
+  - Fixed /admin routing in single-port mode
+  - Simplified deployment with path-based routing
+  - Added certificate management UI (upload custom certs or generate new ones)
+  - Maintained backward compatibility with dual-port mode
 
 - 0.3.1d:
   - Added project group and name to the UI (issue #3)

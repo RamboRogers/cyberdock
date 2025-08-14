@@ -1,3 +1,17 @@
+// Get base path for API calls (handles both single-port and dual-port modes)
+const getBasePath = () => {
+    // Check if we're in the /admin/ path (single-port mode)
+    const pathPrefix = window.location.pathname.startsWith('/admin/') ? '/admin' : '';
+    return pathPrefix;
+};
+
+const apiPath = (path) => {
+    const base = getBasePath();
+    // For API calls, prepend base path if we're in single-port mode
+    const normalizedPath = path.startsWith('/') ? path : '/' + path;
+    return base + normalizedPath;
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize matrix background with a delay
     setTimeout(() => {
@@ -239,7 +253,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to make API request with proper headers
     const apiRequest = async (url, options = {}) => {
-        const response = await fetch(url, {
+        // Adjust URL for single-port mode if needed
+        const adjustedUrl = apiPath(url);
+        const response = await fetch(adjustedUrl, {
             method: options.method || 'GET',
             headers: {
                 'Accept': 'application/json',
@@ -885,7 +901,223 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    
+    // Theme initialization and switching
+    function initTheme() {
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+        const themeIcon = themeToggle.querySelector('.theme-icon');
+        
+        // Load saved theme from localStorage
+        const savedTheme = localStorage.getItem('cyberdock-theme') || 'cyber';
+        body.setAttribute('data-theme', savedTheme);
+        updateThemeIcon(savedTheme, themeIcon);
+        
+        // Add event listener for theme toggle
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = body.getAttribute('data-theme') || 'cyber';
+            const newTheme = currentTheme === 'cyber' ? 'boomer' : 'cyber';
+            
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('cyberdock-theme', newTheme);
+            updateThemeIcon(newTheme, themeIcon);
+            
+            // Restart or stop matrix animation based on theme
+            const canvas = document.getElementById('matrixCanvas');
+            if (newTheme === 'boomer') {
+                // Stop matrix animation for boomer theme
+                if (window.matrixAnimation) {
+                    cancelAnimationFrame(window.matrixAnimation);
+                    window.matrixAnimation = null;
+                }
+            } else {
+                // Restart matrix animation for cyber theme
+                if (canvas && window.initMatrix) {
+                    initMatrix('matrixCanvas', 0.45);
+                }
+            }
+        });
+    }
+    
+    function updateThemeIcon(theme, iconElement) {
+        iconElement.textContent = theme === 'cyber' ? '☀️' : '🌙';
+    }
+    
+    // Initialize theme
+    initTheme();
+    
+    // Initialize certificate management
+    initCertificateManagement();
 });
+
+// Certificate Management Functions
+function initCertificateManagement() {
+    const certTab = document.querySelector('[data-tab="certificates"]');
+    const certForm = document.getElementById('cert-upload-form');
+    const generateBtn = document.getElementById('generate-cert-btn');
+    const refreshBtn = document.getElementById('refresh-cert-btn');
+    
+    // Load certificate info when tab is clicked
+    if (certTab) {
+        certTab.addEventListener('click', loadCertificateInfo);
+    }
+    
+    // Handle certificate upload
+    if (certForm) {
+        certForm.addEventListener('submit', handleCertificateUpload);
+    }
+    
+    // Handle generate new certificate
+    if (generateBtn) {
+        generateBtn.addEventListener('click', generateNewCertificate);
+    }
+    
+    // Handle refresh certificate info
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', loadCertificateInfo);
+    }
+}
+
+async function loadCertificateInfo() {
+    const statusPanel = document.getElementById('cert-status');
+    if (!statusPanel) return;
+    
+    statusPanel.innerHTML = '<div class="loading">Loading certificate information...</div>';
+    
+    try {
+        const response = await fetch(apiPath('/api/certificate/info'));
+        const data = await response.json();
+        
+        if (response.ok) {
+            displayCertificateInfo(data);
+        } else {
+            statusPanel.innerHTML = `<div class="error">Error loading certificate info: ${data.error || 'Unknown error'}</div>`;
+        }
+    } catch (error) {
+        statusPanel.innerHTML = `<div class="error">Failed to load certificate info: ${error.message}</div>`;
+    }
+}
+
+function displayCertificateInfo(certInfo) {
+    const statusPanel = document.getElementById('cert-status');
+    if (!statusPanel) return;
+    
+    const html = `
+        <div class="cert-details">
+            <div class="cert-field">
+                <span class="field-label">Subject:</span>
+                <span class="field-value">${certInfo.subject || 'N/A'}</span>
+            </div>
+            <div class="cert-field">
+                <span class="field-label">Issuer:</span>
+                <span class="field-value">${certInfo.issuer || 'N/A'}</span>
+            </div>
+            <div class="cert-field">
+                <span class="field-label">Valid From:</span>
+                <span class="field-value">${certInfo.validFrom ? new Date(certInfo.validFrom).toLocaleString() : 'N/A'}</span>
+            </div>
+            <div class="cert-field">
+                <span class="field-label">Valid Until:</span>
+                <span class="field-value">${certInfo.validUntil ? new Date(certInfo.validUntil).toLocaleString() : 'N/A'}</span>
+            </div>
+            <div class="cert-field">
+                <span class="field-label">DNS Names:</span>
+                <span class="field-value">${certInfo.dnsNames ? certInfo.dnsNames.join(', ') : 'N/A'}</span>
+            </div>
+            <div class="cert-field">
+                <span class="field-label">Type:</span>
+                <span class="field-value">${certInfo.isCustom ? 'Custom Certificate' : 'Self-Signed Certificate'}</span>
+            </div>
+        </div>
+    `;
+    
+    statusPanel.innerHTML = html;
+}
+
+async function handleCertificateUpload(event) {
+    event.preventDefault();
+    
+    const certFile = document.getElementById('cert-file').files[0];
+    const keyFile = document.getElementById('key-file').files[0];
+    const uploadStatus = document.getElementById('upload-status');
+    
+    if (!certFile || !keyFile) {
+        showUploadStatus('Please select both certificate and key files', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('cert', certFile);
+    formData.append('key', keyFile);
+    
+    uploadStatus.innerHTML = 'Uploading certificate...';
+    uploadStatus.className = 'upload-status';
+    uploadStatus.style.display = 'block';
+    
+    try {
+        const response = await fetch(apiPath('/api/certificate/upload'), {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showUploadStatus('Certificate uploaded successfully! Server will restart to apply changes.', 'success');
+            // Clear form
+            document.getElementById('cert-upload-form').reset();
+            // Reload certificate info after a delay
+            setTimeout(loadCertificateInfo, 3000);
+        } else {
+            showUploadStatus(`Upload failed: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        showUploadStatus(`Upload failed: ${error.message}`, 'error');
+    }
+}
+
+async function generateNewCertificate() {
+    if (!confirm('This will generate a new self-signed certificate. Continue?')) {
+        return;
+    }
+    
+    const uploadStatus = document.getElementById('upload-status');
+    uploadStatus.innerHTML = 'Generating new certificate...';
+    uploadStatus.className = 'upload-status';
+    uploadStatus.style.display = 'block';
+    
+    try {
+        const response = await fetch(apiPath('/api/certificate/generate'), {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showUploadStatus('New certificate generated successfully!', 'success');
+            // Reload certificate info
+            setTimeout(loadCertificateInfo, 1000);
+        } else {
+            showUploadStatus(`Generation failed: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        showUploadStatus(`Generation failed: ${error.message}`, 'error');
+    }
+}
+
+function showUploadStatus(message, type) {
+    const uploadStatus = document.getElementById('upload-status');
+    uploadStatus.innerHTML = message;
+    uploadStatus.className = `upload-status ${type}`;
+    uploadStatus.style.display = 'block';
+    
+    // Auto-hide success messages after 5 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            uploadStatus.style.display = 'none';
+        }, 5000);
+    }
+}
 
 // Add search-related styles to the existing CSS
 const searchStyles = document.createElement('style');
