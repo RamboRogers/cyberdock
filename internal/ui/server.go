@@ -536,14 +536,20 @@ func (s *Server) handleCertificateUpload(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	
-	// Overwrite the default certificates directly
-	// This ensures they'll be used on next restart
-	if err := os.WriteFile("cert.pem", certData, 0644); err != nil {
+	// Ensure data directory exists
+	if err := os.MkdirAll("data", 0755); err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create data directory"})
+		return
+	}
+	
+	// Overwrite the default certificates directly in data directory
+	// This ensures they'll be used on next restart and persist in Docker volumes
+	if err := os.WriteFile("data/cert.pem", certData, 0644); err != nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save certificate"})
 		return
 	}
 	
-	if err := os.WriteFile("key.pem", keyData, 0600); err != nil {
+	if err := os.WriteFile("data/key.pem", keyData, 0600); err != nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save key"})
 		return
 	}
@@ -569,13 +575,19 @@ func (s *Server) handleCertificateGenerate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	
-	// Save the new certificates
-	if err := os.WriteFile(s.certFile, cert, 0644); err != nil {
+	// Ensure data directory exists
+	if err := os.MkdirAll("data", 0755); err != nil {
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create data directory"})
+		return
+	}
+	
+	// Save the new certificates to data directory
+	if err := os.WriteFile("data/cert.pem", cert, 0644); err != nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save certificate"})
 		return
 	}
 	
-	if err := os.WriteFile(s.keyFile, key, 0600); err != nil {
+	if err := os.WriteFile("data/key.pem", key, 0600); err != nil {
 		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to save key"})
 		return
 	}

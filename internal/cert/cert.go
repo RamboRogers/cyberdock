@@ -15,12 +15,17 @@ import (
 )
 
 const (
-	CertFile = "cert.pem"
-	KeyFile  = "key.pem"
+	CertFile = "data/cert.pem"
+	KeyFile  = "data/key.pem"
 )
 
 // InitCertificates ensures valid certificates exist or generates new ones
 func InitCertificates() (cert, key []byte, err error) {
+	// Ensure data directory exists
+	if err := os.MkdirAll("data", 0755); err != nil {
+		return nil, nil, fmt.Errorf("failed to create data directory: %v", err)
+	}
+	
 	// Check if certificates already exist
 	if cert, key, err = loadCertificates(); err == nil {
 		log.Println("Using existing SSL/TLS certificates")

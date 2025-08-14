@@ -165,7 +165,7 @@ func main() {
 		}
 
 		// Create UI server (but don't start it)
-		uiServer := ui.NewServer(certData, keyData, cert.CertFile, cert.KeyFile, *port, registryServer, version)
+		uiServer := ui.NewServer(certData, keyData, "data/cert.pem", "data/key.pem", *port, registryServer, version)
 		
 		// Initialize UI routes and start monitoring
 		uiServer.InitializeRoutes()
@@ -179,7 +179,7 @@ func main() {
 
 		// Start unified server
 		go func() {
-			if err := unifiedServer.ListenAndServeTLS(cert.CertFile, cert.KeyFile); err != nil {
+			if err := unifiedServer.ListenAndServeTLS("data/cert.pem", "data/key.pem"); err != nil {
 				log.Fatalf("Unified server failed: %v", err)
 			}
 		}()
@@ -195,7 +195,7 @@ func main() {
 		}
 
 		// Create UI server with registry instance
-		uiServer := ui.NewServer(certData, keyData, cert.CertFile, cert.KeyFile, *uiPort, registryServer, version)
+		uiServer := ui.NewServer(certData, keyData, "data/cert.pem", "data/key.pem", *uiPort, registryServer, version)
 
 		// Start registry server in a goroutine
 		go func() {

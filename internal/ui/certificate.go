@@ -28,8 +28,8 @@ type CertificateInfo struct {
 
 // getCertificateInfo retrieves information about the current certificate
 func (s *Server) getCertificateInfo() (*CertificateInfo, error) {
-	// Always read from the main certificate file
-	certPath := s.certFile
+	// Always read from the main certificate file in data directory
+	certPath := "data/cert.pem"
 	
 	// Read certificate file
 	certPEM, err := ioutil.ReadFile(certPath)
