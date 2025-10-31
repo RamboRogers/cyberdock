@@ -17,7 +17,7 @@
   <p><strong>Cyberpunk Docker Registry Interface</strong></p>
   <p>🐳 Docker Registry | 🌍 Web UI | ⚡ Fast | 🎨 Beautiful | 🔒 Secure</p>
   <p>
-    <img src="https://img.shields.io/badge/version-0.3.2d-blue.svg" alt="Version 0.3.2d">
+    <img src="https://img.shields.io/badge/version-0.3.3-blue.svg" alt="Version 0.3.3">
     <img src="https://img.shields.io/badge/go-%3E%3D1.21-00ADD8.svg" alt="Go Version">
     <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20docker-brightgreen.svg" alt="Platform Support">
     <img src="https://img.shields.io/badge/license-GPLv3-green.svg" alt="License">
@@ -191,6 +191,12 @@ Command line flags:
 Note: When both `-r` and `-g` are specified, CyberDock automatically switches to dual-port mode for backward compatibility.
 
 ## ⚡️ Updates
+
+- 0.3.3:
+  - Fixed tag update bug that prevented pushing latest tags over existing images
+  - Enhanced support for multi-level repository paths (org/team/project)
+  - Improved layer deduplication - shared layers now properly preserved during updates
+  - Added comprehensive path validation across all registry operations
 
 - 0.3.2d:
   - Added single-port mode as default deployment option

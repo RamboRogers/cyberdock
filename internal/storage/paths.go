@@ -153,3 +153,8 @@ func (pm *PathManager) JoinRepository(namespace, name string) string {
 	}
 	return path.Join(namespace, name)
 }
+
+// GetRootDir returns the root directory path for the registry
+func (pm *PathManager) GetRootDir() string {
+	return pm.rootDir
+}

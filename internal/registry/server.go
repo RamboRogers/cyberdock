@@ -501,7 +501,12 @@ func (s *Server) handleBlobHead(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("DEBUG: Handling HEAD request for blob %s in repository %s", digest, repository)
-	path := filepath.Join(s.dataDir, "registry", "repositories", repository, "blobs", digest)
+	path, err := s.paths.GetBlobPath(repository, digest)
+	if err != nil {
+		log.Printf("ERROR: Failed to get blob path: %v", err)
+		http.Error(w, "Invalid repository name", http.StatusBadRequest)
+		return
+	}
 	log.Printf("DEBUG: Looking for blob at path: %s", path)
 
 	info, err := os.Stat(path)
@@ -532,7 +537,12 @@ func (s *Server) handleBlobGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("DEBUG: Handling GET request for blob %s in repository %s", digest, repository)
-	path := filepath.Join(s.dataDir, "registry", "repositories", repository, "blobs", digest)
+	path, err := s.paths.GetBlobPath(repository, digest)
+	if err != nil {
+		log.Printf("ERROR: Failed to get blob path: %v", err)
+		http.Error(w, "Invalid repository name", http.StatusBadRequest)
+		return
+	}
 	log.Printf("DEBUG: Looking for blob at path: %s", path)
 
 	// Open and serve the file
@@ -572,7 +582,13 @@ func (s *Server) handleBlobDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := filepath.Join(s.dataDir, "registry", "repositories", repository, "blobs", digest)
+	path, err := s.paths.GetBlobPath(repository, digest)
+	if err != nil {
+		log.Printf("ERROR: Failed to get blob path: %v", err)
+		http.Error(w, "Invalid repository name", http.StatusBadRequest)
+		return
+	}
+
 	if err := os.Remove(path); err != nil {
 		if os.IsNotExist(err) {
 			http.NotFound(w, r)
@@ -624,7 +640,12 @@ func (s *Server) handleManifestHead(w http.ResponseWriter, r *http.Request) {
 	log.Printf("DEBUG: Handling manifest HEAD request for repository: %s, reference: %s", repository, reference)
 	log.Printf("DEBUG: Accept header: %s", r.Header.Get("Accept"))
 
-	path := filepath.Join(s.dataDir, "registry", "repositories", repository, "manifests", reference)
+	path, err := s.paths.GetManifestPath(repository, reference)
+	if err != nil {
+		log.Printf("ERROR: Failed to get manifest path: %v", err)
+		http.Error(w, "Invalid repository name", http.StatusBadRequest)
+		return
+	}
 
 	// Check if manifest exists
 	fi, err := os.Lstat(path)
@@ -798,6 +819,20 @@ func (s *Server) handleManifestPut(w http.ResponseWriter, r *http.Request) {
 
 	// Only handle tag symlink if reference is not a digest
 	if !strings.HasPrefix(reference, "sha256:") {
+		// Parse the new manifest to identify layers we need to keep
+		newBlobDigests := make(map[string]bool)
+		var newManifest ManifestV2
+		if err := json.Unmarshal(body, &newManifest); err == nil {
+			// Add config digest
+			if newManifest.Config.Digest != "" {
+				newBlobDigests[newManifest.Config.Digest] = true
+			}
+			// Add all layer digests
+			for _, layer := range newManifest.Layers {
+				newBlobDigests[layer.Digest] = true
+			}
+		}
+
 		// Check if tag already exists and get its current manifest
 		currentTagPath := filepath.Join(filepath.Dir(manifestPath), reference)
 		if fi, err := os.Lstat(currentTagPath); err == nil && fi.Mode()&os.ModeSymlink != 0 {
@@ -829,11 +864,32 @@ func (s *Server) handleManifestPut(w http.ResponseWriter, r *http.Request) {
 						if err == nil {
 							var oldManifest ManifestV2
 							if err := json.Unmarshal(oldData, &oldManifest); err == nil {
-								// Delete old layers
+								// Delete old config blob if not used by new manifest
+								if oldManifest.Config.Digest != "" && !newBlobDigests[oldManifest.Config.Digest] {
+									blobPath, err := s.paths.GetBlobPath(repository, oldManifest.Config.Digest)
+									if err != nil {
+										log.Printf("WARNING: Failed to get config blob path: %v", err)
+									} else if err := os.Remove(blobPath); err != nil && !os.IsNotExist(err) {
+										log.Printf("WARNING: Failed to delete old config blob %s: %v", oldManifest.Config.Digest, err)
+									} else {
+										log.Printf("DEBUG: Deleted old config blob %s", oldManifest.Config.Digest)
+									}
+								}
+								// Delete old layers only if not shared with new manifest
 								for _, layer := range oldManifest.Layers {
-									blobPath := filepath.Join(s.dataDir, "registry", "repositories", repository, "blobs", layer.Digest)
-									if err := os.Remove(blobPath); err != nil && !os.IsNotExist(err) {
-										log.Printf("WARNING: Failed to delete old layer %s: %v", layer.Digest, err)
+									if !newBlobDigests[layer.Digest] {
+										blobPath, err := s.paths.GetBlobPath(repository, layer.Digest)
+										if err != nil {
+											log.Printf("WARNING: Failed to get layer blob path: %v", err)
+											continue
+										}
+										if err := os.Remove(blobPath); err != nil && !os.IsNotExist(err) {
+											log.Printf("WARNING: Failed to delete old layer %s: %v", layer.Digest, err)
+										} else {
+											log.Printf("DEBUG: Deleted old layer %s", layer.Digest)
+										}
+									} else {
+										log.Printf("DEBUG: Keeping shared layer %s", layer.Digest)
 									}
 								}
 								// Delete old manifest
@@ -908,8 +964,13 @@ func (s *Server) handleManifestDelete(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("DEBUG: Deleting manifest for repository: %s, reference: %s", repository, reference)
 
-	// Construct the full path using registry/repositories as base
-	path := filepath.Join(s.dataDir, "registry", "repositories", repository, "manifests", reference)
+	// Get the manifest path using PathManager
+	path, err := s.paths.GetManifestPath(repository, reference)
+	if err != nil {
+		log.Printf("ERROR: Failed to get manifest path: %v", err)
+		http.Error(w, "Invalid repository name", http.StatusBadRequest)
+		return
+	}
 	log.Printf("DEBUG: Deleting manifest at path: %s", path)
 
 	// First update the in-memory manifest map before deleting files
@@ -927,7 +988,7 @@ func (s *Server) handleManifestDelete(w http.ResponseWriter, r *http.Request) {
 			// If no tags left, remove the repository entry
 			delete(s.manifest, repository)
 			// Also remove the repository directory if it's empty
-			repoDir := filepath.Join(s.dataDir, "registry", "repositories", repository)
+			repoDir := filepath.Join(s.paths.GetRootDir(), storage.RepositoriesDir, repository)
 			if err := os.RemoveAll(repoDir); err != nil {
 				log.Printf("WARNING: Failed to remove empty repository directory %s: %v", repoDir, err)
 			}
@@ -1221,7 +1282,11 @@ func (s *Server) GetImageInfo() ([]ImageInfo, error) {
 				}
 
 				// Get the actual manifest for this platform
-				platformManifestPath := filepath.Join(s.dataDir, "registry", "repositories", repository, "blobs", m.Digest)
+				platformManifestPath, err := s.paths.GetBlobPath(repository, m.Digest)
+				if err != nil {
+					log.Printf("WARNING: Failed to get platform manifest blob path: %v", err)
+					continue
+				}
 				manifestData, err := os.ReadFile(platformManifestPath)
 				if err != nil {
 					log.Printf("WARNING: Error reading platform manifest %s: %v", m.Digest, err)
@@ -1310,8 +1375,11 @@ func (s *Server) DeleteImage(repository, reference string) error {
 		return fmt.Errorf("failed to validate repository: %v", err)
 	}
 
-	// Construct the full path according to design
-	fullManifestPath := filepath.Join(s.dataDir, "registry", "repositories", repository, "manifests", reference)
+	// Get the manifest path using PathManager
+	fullManifestPath, err := s.paths.GetManifestPath(repository, reference)
+	if err != nil {
+		return fmt.Errorf("failed to get manifest path: %v", err)
+	}
 	log.Printf("DEBUG: Looking for manifest at: %s", fullManifestPath)
 
 	// Check if it's a symlink and resolve it
@@ -1381,14 +1449,20 @@ func (s *Server) DeleteImage(repository, reference string) error {
 		if err := json.Unmarshal(data, &manifest); err == nil {
 			// Delete config blob
 			if manifest.Config.Digest != "" {
-				configPath := filepath.Join(s.dataDir, "registry", "repositories", repository, "blobs", manifest.Config.Digest)
-				if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
+				configPath, err := s.paths.GetBlobPath(repository, manifest.Config.Digest)
+				if err != nil {
+					log.Printf("WARNING: Failed to get config blob path: %v", err)
+				} else if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
 					log.Printf("WARNING: Failed to delete config blob: %v", err)
 				}
 			}
 			// Delete all layers
 			for _, layer := range manifest.Layers {
-				blobPath := filepath.Join(s.dataDir, "registry", "repositories", repository, "blobs", layer.Digest)
+				blobPath, err := s.paths.GetBlobPath(repository, layer.Digest)
+				if err != nil {
+					log.Printf("WARNING: Failed to get layer blob path: %v", err)
+					continue
+				}
 				log.Printf("DEBUG: Deleting layer at: %s", blobPath)
 				if err := os.Remove(blobPath); err != nil && !os.IsNotExist(err) {
 					log.Printf("WARNING: Failed to delete layer %s: %v", layer.Digest, err)
@@ -1406,21 +1480,31 @@ func (s *Server) DeleteImage(repository, reference string) error {
 					}
 
 					// Get and delete the platform-specific manifest
-					platformManifestPath := filepath.Join(s.dataDir, "registry", "repositories", repository, "blobs", m.Digest)
+					platformManifestPath, err := s.paths.GetBlobPath(repository, m.Digest)
+					if err != nil {
+						log.Printf("WARNING: Failed to get platform manifest blob path: %v", err)
+						continue
+					}
 					platformData, err := os.ReadFile(platformManifestPath)
 					if err == nil {
 						var platformManifest ManifestV2
 						if err := json.Unmarshal(platformData, &platformManifest); err == nil {
 							// Delete config blob
 							if platformManifest.Config.Digest != "" {
-								configPath := filepath.Join(s.dataDir, "registry", "repositories", repository, "blobs", platformManifest.Config.Digest)
-								if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
+								configPath, err := s.paths.GetBlobPath(repository, platformManifest.Config.Digest)
+								if err != nil {
+									log.Printf("WARNING: Failed to get platform config blob path: %v", err)
+								} else if err := os.Remove(configPath); err != nil && !os.IsNotExist(err) {
 									log.Printf("WARNING: Failed to delete platform config blob: %v", err)
 								}
 							}
 							// Delete all layers
 							for _, layer := range platformManifest.Layers {
-								blobPath := filepath.Join(s.dataDir, "registry", "repositories", repository, "blobs", layer.Digest)
+								blobPath, err := s.paths.GetBlobPath(repository, layer.Digest)
+								if err != nil {
+									log.Printf("WARNING: Failed to get platform layer blob path: %v", err)
+									continue
+								}
 								log.Printf("DEBUG: Deleting platform layer at: %s", blobPath)
 								if err := os.Remove(blobPath); err != nil && !os.IsNotExist(err) {
 									log.Printf("WARNING: Failed to delete platform layer %s: %v", layer.Digest, err)
@@ -1463,7 +1547,7 @@ func (s *Server) DeleteImage(repository, reference string) error {
 			// If no tags left, remove the repository entry
 			delete(s.manifest, repository)
 			// Also remove the repository directory if it's empty
-			repoDir := filepath.Join(s.dataDir, "registry", "repositories", repository)
+			repoDir := filepath.Join(s.paths.GetRootDir(), storage.RepositoriesDir, repository)
 			if err := os.RemoveAll(repoDir); err != nil {
 				log.Printf("WARNING: Failed to remove empty repository directory %s: %v", repoDir, err)
 			}
@@ -1647,31 +1731,44 @@ func (s *Server) scanExistingTags() error {
 	log.Printf("DEBUG: Scanning existing tags in registry")
 	registryPath := filepath.Join(s.dataDir, "registry", "repositories")
 
-	// Read repository directories
-	repos, err := os.ReadDir(registryPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Printf("DEBUG: No existing repositories found")
-			return nil
-		}
-		return fmt.Errorf("failed to read registry directory: %v", err)
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Scan each repository
-	for _, repo := range repos {
-		if !repo.IsDir() {
-			continue
-		}
-		repoName := repo.Name()
-		manifestDir := filepath.Join(registryPath, repoName, "manifests")
-
-		entries, err := os.ReadDir(manifestDir)
+	// Use filepath.Walk to recursively find all manifests directories
+	err := filepath.Walk(registryPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Printf("WARNING: Failed to read manifests for repository %s: %v", repoName, err)
-			continue
+			if os.IsNotExist(err) {
+				return nil
+			}
+			return err
+		}
+
+		// Skip if not a manifests directory
+		if !info.IsDir() || !strings.HasSuffix(path, "manifests") {
+			return nil
+		}
+
+		// Extract repository name by removing the base path and /manifests suffix
+		relPath := strings.TrimPrefix(path, registryPath)
+		relPath = strings.TrimPrefix(relPath, "/")
+		relPath = strings.TrimSuffix(relPath, "/manifests")
+
+		// Skip if this is just the base path (empty repository name)
+		if relPath == "" {
+			return nil
+		}
+
+		// Validate the repository name
+		if err := s.paths.ValidateRepository(relPath); err != nil {
+			log.Printf("WARNING: Invalid repository path found: %s", relPath)
+			return nil
+		}
+
+		// Read tags from this manifests directory
+		entries, err := os.ReadDir(path)
+		if err != nil {
+			log.Printf("WARNING: Failed to read manifests for repository %s: %v", relPath, err)
+			return nil
 		}
 
 		var tags []string
@@ -1685,10 +1782,17 @@ func (s *Server) scanExistingTags() error {
 
 		if len(tags) > 0 {
 			sort.Strings(tags)
-			s.manifest[repoName] = tags
-			log.Printf("DEBUG: Found %d tags for repository %s", len(tags), repoName)
+			s.manifest[relPath] = tags
+			log.Printf("DEBUG: Found %d tags for repository %s", len(tags), relPath)
 		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to scan registry directory: %v", err)
 	}
 
+	log.Printf("DEBUG: Scan completed, found %d repositories", len(s.manifest))
 	return nil
 }
