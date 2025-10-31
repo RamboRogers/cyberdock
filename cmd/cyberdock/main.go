@@ -25,7 +25,7 @@ const (
 	defaultPort         = 5000
 	defaultRegistryPort = 5000  // Kept for backward compatibility
 	defaultUIPort       = 5001  // Kept for backward compatibility
-	version             = "0.3.2d"
+	version             = "0.3.3d"
 )
 
 // These will be set at build time
@@ -157,7 +157,7 @@ func main() {
 	if *useSinglePort {
 		// Single port mode - create unified server
 		log.Printf("Starting CyberDock in single-port mode on port %d", *port)
-		
+
 		// Create registry server (but don't start it)
 		registryServer, err := registry.NewServer(certData, keyData, *port, "data")
 		if err != nil {
@@ -166,7 +166,7 @@ func main() {
 
 		// Create UI server (but don't start it)
 		uiServer := ui.NewServer(certData, keyData, "data/cert.pem", "data/key.pem", *port, registryServer, version)
-		
+
 		// Initialize UI routes and start monitoring
 		uiServer.InitializeRoutes()
 		go uiServer.MonitorDiskUsage()
@@ -187,7 +187,7 @@ func main() {
 		// Legacy dual-port mode
 		log.Printf("Starting CyberDock in legacy dual-port mode")
 		log.Printf("Registry port: %d, UI port: %d", *registryPort, *uiPort)
-		
+
 		// Create registry server
 		registryServer, err := registry.NewServer(certData, keyData, *registryPort, "data")
 		if err != nil {
@@ -249,12 +249,12 @@ func createUnifiedServer(port int, registryServer *registry.Server, uiServer *ui
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, HEAD, OPTIONS, PATCH")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept, Range")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			
+
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	})
