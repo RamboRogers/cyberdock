@@ -1225,7 +1225,7 @@ func (s *Server) GetImageInfo() ([]ImageInfo, error) {
 			var totalSize int64
 
 			// Add manifest size
-			totalSize += info.Size()
+			totalSize += int64(len(data))
 
 			// Add config size
 			if manifest.Config.Digest != "" {
@@ -1271,8 +1271,8 @@ func (s *Server) GetImageInfo() ([]ImageInfo, error) {
 			var platformManifests []ManifestV2
 
 			// Add the size of the index manifest itself
-			totalSize += info.Size()
-			log.Printf("DEBUG: Index manifest size: %d", info.Size())
+			totalSize += int64(len(data))
+			log.Printf("DEBUG: Index manifest size: %d", len(data))
 
 			// Skip attestation manifests and collect platform manifests
 			for _, m := range index.Manifests {
