@@ -110,7 +110,7 @@ If you have a mac 🍏 host and want to work around the port conflicts:
 # Single-port mode on custom port
 docker run -d --name cyberdock -p 5005:5000 mattrogers/cyberdock:latest
 # Access at https://localhost:5005/admin/
-
+```
 
 ## 💻 Usage
 
@@ -129,7 +129,7 @@ Path-based routing:
 
 ### Kubernetes Deployment
 
-Deploy CyberDock to your Kubernetes cluster using metallb for load balancing.
+Deploy CyberDock to your Kubernetes cluster using metallb for load balancing. You can add your cert via the UI, by default generates a self-signed cert. You'll need to restart the pod to apply the new cert.
 
 ```bash
 kubectl apply -f kubernetes/cyberdock.yaml
