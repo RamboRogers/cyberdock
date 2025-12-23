@@ -192,6 +192,10 @@ Note: When both `-r` and `-g` are specified, CyberDock automatically switches to
 
 ## ⚡️ Updates
 
+- 0.3.4d:
+  - Fixed bugs in UI showing incorrect storage totals.
+
+
 - 0.3.3d:
   - Fixed tag update bug that prevented pushing latest tags over existing images
   - Enhanced support for multi-level repository paths (org/team/project)
