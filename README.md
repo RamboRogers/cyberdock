@@ -141,17 +141,18 @@ Path-based routing:
 - `/static/*` - Static assets for the UI
 - `/` - Redirects to `/admin/`
 
-### Legacy Dual-Port Mode
-For backward compatibility, you can still run with separate ports:
-```bash
-./cyberdock -r 5000 -g 5001
-```
-- Registry server on port 5000
-- Web UI server on port 5001
+### Kubernetes Deployment
 
-Remote Purge ☢️
+Deploy CyberDock to your Kubernetes cluster using metallb for load balancing.
+
 ```bash
-curl -k -X POST https://cyberdock:5001/api/purge
+kubectl apply -f kubernetes/cyberdock.yaml
+```
+
+
+### Remote Purge ☢️
+```bash
+curl -k -X POST https://cyberdock:5000/api/purge
 ```
 
 ### Docker Client Configuration
