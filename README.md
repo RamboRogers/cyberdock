@@ -104,15 +104,6 @@ Access points:
 - Admin UI: https://localhost:5000/admin/
 - Root (/) redirects to /admin/
 
-#### Legacy Dual-Port Mode
-```bash
-# Run with separate ports
-docker run -d --name cyberdock -p 5000:5000 -p 5001:5001 mattrogers/cyberdock:latest -r 5000 -g 5001
-```
-
-Access points:
-- Registry: https://localhost:5000
-- Web UI: https://localhost:5001
 
 If you have a mac 🍏 host and want to work around the port conflicts:
 ```bash
@@ -120,11 +111,6 @@ If you have a mac 🍏 host and want to work around the port conflicts:
 docker run -d --name cyberdock -p 5005:5000 mattrogers/cyberdock:latest
 # Access at https://localhost:5005/admin/
 
-# Or dual-port mode
-docker run -d --name cyberdock -p 5005:5000 -p 5006:5001 mattrogers/cyberdock:latest -r 5000 -g 5001
-# Registry: https://localhost:5005
-# Web UI: https://localhost:5006
-```
 
 ## 💻 Usage
 
