@@ -1219,53 +1219,24 @@ func (s *Server) GetImageInfo() ([]ImageInfo, error) {
 			return nil
 		}
 
-		var manifest ManifestV2
-		if err := json.Unmarshal(data, &manifest); err == nil {
-			// For single-platform manifests
-			var totalSize int64
-
-			// Add manifest size
-			totalSize += int64(len(data))
-
-			// Add config size
-			if manifest.Config.Digest != "" {
-				totalSize += manifest.Config.Size
-			}
-
-			// Add layer sizes
-			for _, layer := range manifest.Layers {
-				totalSize += layer.Size
-			}
-
-			imageInfo := ImageInfo{
-				Repository: repository,
-				Name:       strings.Split(repository, "/")[len(strings.Split(repository, "/"))-1],
-				Tag:        reference,
-				MediaType:  manifest.MediaType,
-				Digest:     manifestReference,
-				Size:       totalSize,
-				Created:    info.ModTime(),
-			}
-
-			// Copy layers
-			imageInfo.Layers = make([]LayerInfo, len(manifest.Layers))
-			for i, layer := range manifest.Layers {
-				imageInfo.Layers[i] = LayerInfo{
-					MediaType: layer.MediaType,
-					Digest:    layer.Digest,
-					Size:      layer.Size,
-				}
-			}
-
-			images = append(images, imageInfo)
-			log.Printf("DEBUG: Added single-platform image info for %s:%s with size %d and %d layers",
-				repository, imageInfo.Tag, imageInfo.Size, len(imageInfo.Layers))
+		// First, peek at the media type to determine how to parse
+		var baseManifest struct {
+			MediaType string `json:"mediaType"`
+		}
+		if err := json.Unmarshal(data, &baseManifest); err != nil {
+			log.Printf("WARNING: Failed to parse manifest media type: %v", err)
 			return nil
 		}
 
-		// Try parsing as OCI index
-		var index OCIIndex
-		if err := json.Unmarshal(data, &index); err == nil {
+		// Check if this is an OCI index (multi-platform manifest)
+		if baseManifest.MediaType == "application/vnd.oci.image.index.v1+json" ||
+			baseManifest.MediaType == "application/vnd.docker.distribution.manifest.list.v2+json" {
+			var index OCIIndex
+			if err := json.Unmarshal(data, &index); err != nil {
+				log.Printf("WARNING: Failed to parse OCI index: %v", err)
+				return nil
+			}
+
 			// Calculate total size for all platforms
 			var totalSize int64
 			var platformManifests []ManifestV2
@@ -1281,10 +1252,10 @@ func (s *Server) GetImageInfo() ([]ImageInfo, error) {
 					continue
 				}
 
-				// Get the actual manifest for this platform
-				platformManifestPath, err := s.paths.GetBlobPath(repository, m.Digest)
+				// Get the actual manifest for this platform (stored in manifests dir, not blobs)
+				platformManifestPath, err := s.paths.GetManifestPath(repository, m.Digest)
 				if err != nil {
-					log.Printf("WARNING: Failed to get platform manifest blob path: %v", err)
+					log.Printf("WARNING: Failed to get platform manifest path: %v", err)
 					continue
 				}
 				manifestData, err := os.ReadFile(platformManifestPath)
@@ -1355,7 +1326,51 @@ func (s *Server) GetImageInfo() ([]ImageInfo, error) {
 			return nil
 		}
 
-		log.Printf("WARNING: Failed to parse manifest as V2 or OCI index: %s", manifestPath)
+		// Handle single-platform manifests (Docker V2 or OCI manifest)
+		var manifest ManifestV2
+		if err := json.Unmarshal(data, &manifest); err != nil {
+			log.Printf("WARNING: Failed to parse manifest as V2: %v", err)
+			return nil
+		}
+
+		var totalSize int64
+
+		// Add manifest size
+		totalSize += int64(len(data))
+
+		// Add config size
+		if manifest.Config.Digest != "" {
+			totalSize += manifest.Config.Size
+		}
+
+		// Add layer sizes
+		for _, layer := range manifest.Layers {
+			totalSize += layer.Size
+		}
+
+		imageInfo := ImageInfo{
+			Repository: repository,
+			Name:       strings.Split(repository, "/")[len(strings.Split(repository, "/"))-1],
+			Tag:        reference,
+			MediaType:  manifest.MediaType,
+			Digest:     manifestReference,
+			Size:       totalSize,
+			Created:    info.ModTime(),
+		}
+
+		// Copy layers
+		imageInfo.Layers = make([]LayerInfo, len(manifest.Layers))
+		for i, layer := range manifest.Layers {
+			imageInfo.Layers[i] = LayerInfo{
+				MediaType: layer.MediaType,
+				Digest:    layer.Digest,
+				Size:      layer.Size,
+			}
+		}
+
+		images = append(images, imageInfo)
+		log.Printf("DEBUG: Added single-platform image info for %s:%s with size %d and %d layers",
+			repository, imageInfo.Tag, imageInfo.Size, len(imageInfo.Layers))
 		return nil
 	})
 

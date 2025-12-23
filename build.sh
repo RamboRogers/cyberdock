@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="0.3.3d"
+VERSION="0.3.4d"
 rm -rf bins/*
 mkdir -p bins
 
@@ -45,7 +45,7 @@ cd -
 
 echo "Build complete!"
 
-read -p "Push to Docker Hub? (y/n): " push
+read -p "Push to Docker Hub (ramborogers/cyberdock)? (y/n): " push
 if [ "$push" = "y" ]; then
   # Building Docker Image
   echo "Building for Linux platform..."
@@ -57,14 +57,14 @@ if [ "$push" = "y" ]; then
     -f Dockerfile.multi .
 fi
 
-read -p "Push to Gitea? (y/n): " push
+read -p "Push to GitHub Container Registry (ghcr.io/ramborogers/cyberdock)? (y/n): " push
 if [ "$push" = "y" ]; then
-  # Building Docker Image
+  # Building Docker Image for GitHub Container Registry
   echo "Building for Linux platform..."
   docker buildx build \
     --push \
     --platform linux/amd64,linux/arm64 \
-    -t cyberpam:5000/matt/cyberdock:latest \
-    -t cyberpam:5000/matt/cyberdock:${VERSION} \
+    -t ghcr.io/ramborogers/cyberdock:latest \
+    -t ghcr.io/ramborogers/cyberdock:${VERSION} \
     -f Dockerfile.multi .
 fi

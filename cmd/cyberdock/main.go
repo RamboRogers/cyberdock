@@ -25,7 +25,7 @@ const (
 	defaultPort         = 5000
 	defaultRegistryPort = 5000  // Kept for backward compatibility
 	defaultUIPort       = 5001  // Kept for backward compatibility
-	version             = "0.3.3d"
+	version             = "0.3.4d"
 )
 
 // These will be set at build time
